@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SCANIA iRIZAR Climate Control</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Local JS libraries -->
+  <script src="jquery.min.js"></script>
+  <script src="jquery.knob.min.js"></script>
+
+  <!-- Local Poppins Bold font -->
+  <style>
+    @font-face {
+      font-family: 'Poppins';
+      src: url('Poppins-Bold.ttf') format('truetype');
+      font-weight: bold;
+      font-style: normal;
+    }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      font-weight: bold;
+      background: #f0f4f7;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    h1 { color: #333; }
+    .sidebar { width: 150px; background: #2c3e50; color: white; padding: 20px; text-align: center; }
+    .main { flex: 1; text-align: center; padding: 20px; }
+    .knob-container { margin: 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+
+    .temp-display {
+      font-size: 120px;
+      line-height: 1;
+      margin: 20px;
+      color: #87CEEB; /* default sky blue */
+      transition: color 0.3s;
+    }
+
+    .system-btn { cursor: pointer; width: 128px; height: 128px; margin: 20px auto; }
+    .system-btn svg { width: 100%; height: 100%; fill: #4CAF50; transition: fill 0.3s; }
+    .system-btn.on svg { fill: #FF0000; }
+
+    .disabled { opacity: 0.4; pointer-events: none; }
+
+    .recirc-knob {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      border: 6px solid #4CAF50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: border-color 0.3s;
+    }
+    .recirc-knob img { width: 70%; height: 70%; }
+    .recirc-knob.active { border-color: #FF0000; }
+
+    .icon { width: 64px; height: 64px; }
+    .icon img { width: 100%; height: 100%; }
+
+    .knob-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+
+    @media (max-width: 600px) {
+      body { flex-direction: column; }
+      .sidebar { width: 100%; padding: 10px; }
+      .main { padding: 10px; }
+      .knob-row { flex-direction: column; gap: 15px; }
+      h1 { font-size: 1.4em; }
+      .temp-display { font-size: 100px; }
+      .knob-container { flex-direction: row; gap: 15px; }
+      .icon { width: 48px; height: 48px; }
+    }
+
+    @media (min-width: 601px) and (max-width: 1024px) {
+      body { flex-direction: column; }
+      .sidebar { width: 100%; }
+      .main { padding: 15px; }
+      .knob-row { flex-direction: row; justify-content: space-around; }
+      h1 { font-size: 1.6em; }
+    }
+
+    @media (min-width: 1025px) {
+      body { flex-direction: column; }
+      .sidebar { width: 150px; }
+      .knob-row { flex-direction: row; justify-content: center; }
+      h1 { font-size: 2em; }
+    }
+
+    .footer {
+      text-align: center;
+      font-size: 0.9em;
+      color: #555;
+      padding: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <div id="systemBtn" class="system-btn on" onclick="toggleSystem(this)">
+      <svg viewBox="0 0 100 125">
+        <path d="M54,42V24a4,4,0,0,0-8,0V42a4,4,0,0,0,8,0Z"/>
+        <path d="M36.2,32.85h0a4,4,0,0,0-6.08-.48,28,28,0,1,0,39.78,0A4,4,0,1,0,64.27,38,19.67,19.67,0,0,1,70,51.8,20,20,0,1,1,30,52a19.67,19.67,0,0,1,5.73-14A4,4,0,0,0,36.2,32.85Z"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="main">
+    <h1>SCANIA iRIZAR Climate Control</h1>
+    <div id="currentTemp" class="temp-display">-- &deg;C</div>
+
+    <div class="knob-row control">
+      <div class="knob-container">
+        <div class="icon"><img src="fan.svg" alt="Fan icon"></div>
+        <input type="text" id="fanKnob" value="0">
+      </div>
+
+      <div class="knob-container">
+        <div class="icon"><img src="temperature.svg" alt="Temperature icon"></div>
+        <input type="text" id="tempKnob" value="24">
+      </div>
+
+      <div class="knob-container">
+        <div class="icon"><img src="recirculation.svg" alt="Recirculation icon"></div>
+        <div id="recircBtn" class="recirc-knob" onclick="toggleRecirc(this)">
+          <img id="recircIcon" src="circulation.svg" alt="Air circulation icon">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">by HerculeMania</div>
+
+  <script>
+    let systemOn = true;
+    let recircOn = false;
+
+    function toggleSystem(btn) {
+      systemOn = !systemOn;
+  btn.classList.toggle("on", systemOn);
+  document.querySelectorAll('.control').forEach(c => {
+    c.classList.toggle('disabled', !systemOn);
+  });
+  // ✅ Send update to backend
+  fetch('/system?state=' + (systemOn ? 'on' : 'off'));
+    }
+
+    function toggleRecirc(btn) {
+      if(systemOn) {
+        recircOn = !recircOn;
+        btn.classList.toggle("active", recircOn);
+        const icon = document.getElementById("recircIcon");
+        icon.src = recircOn ? "recirculation.svg" : "circulation.svg";
+        fetch('/recirc?state=' + (recircOn ? 'on' : 'off'));
+      }
+    }
+
+    async function refreshTemp() {
+  let res = await fetch('/getTemp'); 
+  let t = await res.text();
+  const tempDisplay = document.getElementById('currentTemp');
+
+  let tempVal = parseInt(t);
+  if (!isNaN(tempVal)) {
+    tempDisplay.innerHTML = tempVal.toString() + " &deg;C"; // ✅ safe degree symbol
+    if (tempVal < 20) tempDisplay.style.color = "#1E90FF";
+    else if (tempVal < 28) tempDisplay.style.color = "#4CAF50";
+	else if (tempVal > 28) {tempDisplay.style.color = "#FF0000";tempDisplay.innerHTML = "-- &deg;C";}
+    else tempDisplay.style.color = "#FF0000";
+  } else {
+    tempDisplay.innerHTML = "-- &deg;C";
+    tempDisplay.style.color = "#87CEEB";
+  }
+}
+  setInterval(refreshTemp, 2000);
+
+    $(function() {
+      $("#fanKnob").knob({
+  min: 0,
+  max: 100,
+  step: 50,
+  width: 120,
+  height: 120,
+  fgColor: "#4CAF50",
+  release: function(val) {
+    if(systemOn) {
+      let snapVal = (val < 25) ? 0 : (val < 75 ? 50 : 100);
+	  fetch('/fan?value=' + snapVal)
+        .then(() => console.log("Fan request sent:", snapVal))
+        .catch(err => console.error("Fan fetch error:", err));
+      //$("#fanKnob").val(snapVal).trigger('change'); // ✅ redraw
+      
+    }
+  }
+});
+
+      $("#tempKnob").knob({
+        min: 16,
+        max: 30,
+        width: 120,
+        height: 120,
+        fgColor: "#4CAF50",
+        release: function(val) {
+          if(systemOn) {
+			
+            fetch('/temp?set=' + val);
+          }
+        }
+      });
+    });
+  </script>
+</body>
+</html>
